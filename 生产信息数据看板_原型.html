@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>生产信息数据看板 · 自动考勤与自动排班系统（原型 v20261029e）</title>
+<style>
+:root{--bg:#14171F;--panel:#1B202B;--card:#252C39;--line:#313A4A;--txt:#E8EDF5;--mute:#93A0B0;--green:#14A06A;--glow:#3DD69B;--amber:#E0A020;--red:#E25855;--blue:#3D7BD9;--purple:#8E5CD9;--orange:#E07B39}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--txt);font-family:"Microsoft YaHei","PingFang SC","Noto Sans CJK SC",-apple-system,sans-serif;font-size:14px}
+button{font-family:inherit}
+a{color:var(--glow);text-decoration:none}
+
+/* ===== 顶栏 ===== */
+.topbar{height:52px;background:linear-gradient(180deg,#1E2532,#171B25);border-bottom:1px solid var(--line);display:flex;align-items:center;padding:0 16px;gap:14px;position:sticky;top:0;z-index:50}
+.brand{display:flex;align-items:center;gap:10px;font-weight:700;letter-spacing:.5px}
+.brand .logo{width:30px;height:30px;border-radius:8px;background:linear-gradient(135deg,var(--green),#0E7A50);display:grid;place-items:center;font-size:15px}
+.brand b{font-size:16px}
+.brand small{color:var(--mute);font-weight:400;font-size:12px;margin-left:4px}
+.spacer{flex:1}
+.tbtn{background:var(--card);border:1px solid var(--line);color:var(--txt);height:34px;padding:0 14px;border-radius:8px;cursor:pointer;font-size:13px;transition:.15s}
+.tbtn:hover{border-color:var(--green);color:var(--glow)}
+.tbtn.on{background:var(--green);border-color:var(--green);color:#fff}
+.tbtn.warn{background:rgba(226,92,85,.15);border-color:rgba(226,92,85,.5);color:#ff9a97}
+.pill{display:flex;align-items:center;gap:8px;background:var(--panel);border:1px solid var(--line);height:34px;padding:0 12px;border-radius:17px;font-size:12px;color:var(--mute)}
+.pill .dot{width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 0 0 rgba(61,214,155,.7);animation:pulse 1.8s infinite}
+@keyframes pulse{70%{box-shadow:0 0 0 8px rgba(61,214,155,0)}100%{box-shadow:0 0 0 0 rgba(61,214,155,0)}}
+.avatar{width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,var(--blue),var(--purple));display:grid;place-items:center;font-weight:700;cursor:pointer}
+
+/* ===== 布局 ===== */
+.app{display:flex;height:calc(100% - 52px)}
+.side{width:272px;background:linear-gradient(180deg,#191E29,#14171F);border-right:1px solid var(--line);overflow-y:auto;padding:10px 0 40px;flex-shrink:0;transition:.2s}
+.side::-webkit-scrollbar{width:6px} .side::-webkit-scrollbar-thumb{background:#3a4355;border-radius:3px}
+.workspace{padding:14px 16px 8px;color:var(--mute);font-size:12px;letter-spacing:1px;display:flex;align-items:center;justify-content:space-between}
+.workspace span:last-child{cursor:pointer;font-size:16px}
+.group{margin-top:6px}
+.group-title{padding:14px 18px 6px;color:var(--mute);font-size:12px;display:flex;align-items:center;gap:8px}
+.group-title::before{content:"";width:3px;height:12px;background:var(--green);border-radius:2px}
+.nav-item{display:flex;align-items:center;gap:11px;padding:9px 18px 9px 22px;cursor:pointer;color:#C3CBD8;font-size:14px;border-left:3px solid transparent;transition:.12s}
+.nav-item .ico{width:18px;text-align:center;font-size:15px;color:var(--mute);flex-shrink:0}
+.nav-item:hover{background:var(--card);color:var(--txt)}
+.nav-item.active{background:linear-gradient(90deg,rgba(20,160,106,.28),rgba(20,160,106,.05));color:#fff;border-left-color:var(--green);font-weight:700}
+.nav-item.active .ico{color:var(--glow)}
+.nav-item.child{padding-left:46px;font-size:13px;color:#A8B2C1}
+.nav-item.child .ico{font-size:14px}
+.nav-item .tag{margin-left:auto;font-size:10px;padding:1px 6px;border-radius:4px;background:var(--card);color:var(--mute);border:1px solid var(--line)}
+.badge{margin-left:auto;background:var(--red);color:#fff;font-size:10px;padding:1px 6px;border-radius:10px;font-weight:700}
+.ver{margin:18px 16px 0;padding:10px 12px;background:var(--panel);border:1px solid var(--line);border-radius:10px}
+.ver .v{color:var(--mute);font-size:12px}
+.ver .n{color:var(--txt);font-weight:700;font-size:13px}
+.optag{display:inline-block;margin-top:6px;background:var(--blue);color:#fff;font-size:11px;padding:2px 9px;border-radius:12px;font-weight:700}
+
+/* ===== 主区 ===== */
+.main{flex:1;overflow-y:auto;padding:20px 24px 60px}
+.main::-webkit-scrollbar{width:8px} .main::-webkit-scrollbar-thumb{background:#3a4355;border-radius:4px}
+.crumb{color:var(--mute);font-size:12px;margin-bottom:14px}
+.crumb b{color:var(--glow);font-weight:400}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:20px;margin-bottom:20px}
+.ptitle{display:flex;align-items:center;gap:10px;font-size:18px;font-weight:700;margin-bottom:4px}
+.ptitle .bar{width:4px;height:18px;background:var(--green);border-radius:2px}
+.sub{color:var(--mute);font-size:12px;margin-bottom:18px;line-height:1.7}
+
+/* 空表结构提示 */
+.skeleton{display:flex;flex-direction:column;gap:10px}
+.sk-row{display:flex;gap:10px;align-items:center}
+.sk-cell{height:30px;border-radius:6px;background:linear-gradient(90deg,#212936,#28313F,#212936);background-size:200% 100%;animation:shimmer 1.6s infinite}
+@keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+.empty{text-align:center;padding:46px 20px;border:1.5px dashed var(--line);border-radius:12px;color:var(--mute)}
+.empty .big{font-size:34px;margin-bottom:10px}
+.empty h3{color:var(--txt);margin:0 0 8px;font-size:16px}
+.empty p{margin:4px 0;font-size:13px}
+.empty .acts{margin-top:16px;display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+
+/* 按钮 */
+.btn{background:var(--green);color:#fff;border:0;border-radius:8px;padding:9px 18px;cursor:pointer;font-size:13px;font-weight:700;transition:.15s}
+.btn:hover{filter:brightness(1.1)}
+.btn.ghost{background:var(--card);border:1px solid var(--line);color:var(--txt);font-weight:400}
+.btn.amber{background:var(--amber);color:#1B202B}
+.btn.red{background:var(--red)}
+.btn.sm{padding:5px 11px;font-size:12px}
+
+/* 表格 */
+.tbl-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:10px}
+table{width:100%;border-collapse:collapse;font-size:13px;min-width:720px}
+th{background:var(--card);color:var(--txt);font-weight:700;text-align:left;padding:11px 12px;border-bottom:1px solid var(--line);white-space:nowrap;position:sticky;top:0}
+td{padding:10px 12px;border-bottom:1px solid #232A36;color:var(--txt)}
+tbody tr:hover{background:rgba(61,214,155,.05)}
+tbody tr:last-child td{border-bottom:0}
+.num{text-align:right;font-variant-numeric:tabular-nums}
+.tot{background:var(--card)!important;font-weight:700;color:var(--glow)}
+.hl{color:var(--glow);font-weight:700}
+.muted{color:var(--mute)}
+input.in{background:var(--bg);border:1px solid var(--line);color:var(--txt);border-radius:6px;padding:6px 10px;width:100%;font-size:13px;font-family:inherit}
+input.in:focus{outline:0;border-color:var(--green)}
+select.sel{background:var(--bg);border:1px solid var(--line);color:var(--txt);border-radius:6px;padding:6px 8px;font-size:13px;font-family:inherit}
+
+/* 标签 */
+.chip{display:inline-block;padding:2px 9px;border-radius:12px;font-size:12px;font-weight:700;border:1px solid}
+.chip.ok{background:rgba(20,160,106,.16);color:var(--glow);border-color:rgba(61,214,155,.4)}
+.chip.warn{background:rgba(224,160,32,.16);color:var(--amber);border-color:rgba(224,160,32,.4)}
+.chip.err{background:rgba(226,92,85,.16);color:#ff8b88;border-color:rgba(226,92,85,.4)}
+.chip.info{background:rgba(61,123,217,.16);color:#8ab8ff;border-color:rgba(61,123,217,.4)}
+.chip.grey{background:var(--card);color:var(--mute);border-color:var(--line)}
+
+/* 统计卡 */
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px}
+.kpi{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px}
+.kpi .k{color:var(--mute);font-size:12px}
+.kpi .v{font-size:26px;font-weight:800;margin:6px 0 2px;font-variant-numeric:tabular-nums}
+.kpi .d{font-size:12px;color:var(--mute)}
+.kpi.red .v{color:var(--red)} .kpi.green .v{color:var(--green)} .kpi.amber .v{color:var(--amber)} .kpi.blue .v{color:#6FA8FF}
+
+/* 弹层 */
+.mask{position:fixed;inset:0;background:rgba(10,13,18,.72);display:none;place-items:center;z-index:80;backdrop-filter:blur(2px)}
+.mask.show{display:grid}
+.modal{background:var(--panel);border:1px solid var(--line);border-radius:16px;width:min(860px,94vw);max-height:88vh;overflow-y:auto;padding:24px}
+.modal h2{margin:0 0 6px;font-size:20px}
+.modal .x{float:right;background:0;border:0;color:var(--mute);font-size:22px;cursor:pointer}
+.steps{counter-reset:s;list-style:none;padding:0;margin:14px 0 0}
+.steps li{counter-increment:s;position:relative;padding:10px 0 10px 40px;border-bottom:1px dashed var(--line)}
+.steps li::before{content:counter(s);position:absolute;left:0;top:10px;width:26px;height:26px;background:var(--green);color:#fff;border-radius:50%;display:grid;place-items:center;font-weight:700;font-size:13px}
+.steps code{background:var(--bg);padding:1px 6px;border-radius:4px;color:var(--glow);font-size:12px}
+.toast{position:fixed;bottom:26px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--card);border:1px solid var(--green);color:var(--txt);padding:12px 22px;border-radius:10px;font-size:13px;opacity:0;transition:.25s;z-index:90;box-shadow:0 8px 30px rgba(0,0,0,.5);display:flex;align-items:center;gap:10px}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.toast .ld{width:14px;height:14px;border:2px solid var(--green);border-top-color:transparent;border-radius:50%;animation:spin 1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.hint{background:rgba(61,123,217,.1);border:1px solid rgba(61,123,217,.35);border-radius:10px;padding:12px 14px;font-size:13px;color:#B8D4FF;margin-bottom:16px;line-height:1.8}
+.hint b{color:#fff}
+.split{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:980px){.split{grid-template-columns:1fr}.side{position:fixed;left:-290px;top:52px;height:calc(100% - 52px);z-index:40}.side.open{left:0}}
+.foot{color:var(--mute);font-size:12px;text-align:center;padding:20px;border-top:1px solid var(--line);margin-top:10px}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="brand"><div class="logo">🏭</div><div><b>生产信息数据看板</b><br><small>自动考勤 · 自动排班系统 ｜ 原型演示版</small></div></div>
+  <div class="spacer"></div>
+  <div class="pill"><span class="dot"></span><span id="liveTxt">实时协同已连接 · 3 人在线</span></div>
+  <button class="tbtn" id="simBtn" title="演示：模拟多人在线同时编辑">🧑‍🤝‍🧑 模拟多人协作</button>
+  <button class="tbtn" id="importBtn">📥 手动导入数据</button>
+  <button class="tbtn" onclick="openHelp()">使用说明</button>
+  <div class="avatar" id="who" title="点击切换身份">总</div>
+</div>
+
+<div class="app">
+  <!-- ================= 左侧导航（复刻截图结构） ================= -->
+  <aside class="side" id="side">
+    <div class="workspace"><span>工作区</span><span onclick="document.getElementById('side').classList.toggle('open')">☰</span></div>
+
+    <div class="group">
+      <div class="nav-item active" data-view="board" data-label="生产信息数据看板">
+        <span class="ico">📊</span>生产信息数据看板
+      </div>
+      <div class="nav-item child" data-view="board-open" data-label="各厂当日开线情况">
+        <span class="ico">🏭</span>各厂当日开线情况
+      </div>
+      <div class="nav-item child" data-view="manpower" data-label="各厂人力情况">
+        <span class="ico">👥</span>各厂人力情况
+      </div>
+      <div class="nav-item child" data-view="dispatch" data-label="基地人员调度情况">
+        <span class="ico">🔀</span>基地人员调度情况<span class="badge" id="dsBadge">2</span>
+      </div>
+      <div class="nav-item child" data-view="cadre" data-label="干部梯队情况">
+        <span class="ico">👤</span>干部梯队情况
+      </div>
+    </div>
+
+    <div class="group">
+      <div class="nav-item" data-view="plan" data-label="湖北总厂生产计划">
+        <span class="ico">📅</span>湖北总厂生产计划<span class="tag">手动导入</span>
+      </div>
+      <div class="nav-item" data-view="roster" data-label="湖北总厂花名册">
+        <span class="ico">👥</span>湖北总厂花名册<span class="tag">手动导入</span>
+      </div>
+    </div>
+
+    <div class="group">
+      <div class="group-title">生产部门（8 厂独立）</div>
+      <div class="nav-item" data-view="plant" data-plant="湖北立旺" data-label="湖北立旺">
+        <span class="ico">🏢</span>湖北立旺
+      </div>
+      <div class="nav-item" data-view="plant" data-plant="湖北立旺二厂" data-label="湖北立旺二厂">
+        <span class="ico">🏢</span>湖北立旺二厂
+      </div>
+      <div class="nav-item" data-view="plant" data-plant="湖北立旺三厂" data-label="湖北立旺三厂">
+        <span class="ico">🏢</span>湖北立旺三厂
+      </div>
+      <div class="nav-item" data-view="plant" data-plant="湖北立旺四厂" data-label="湖北立旺四厂">
+        <span class="ico">🏢</span>湖北立旺四厂
+      </div>
+      <div class="nav-item" data-view="plant" data-plant="仙桃旺旺膨化饼干厂" data-label="仙桃旺旺膨化饼干厂">
+        <span class="ico">🏢</span>仙桃旺旺膨化饼干厂
+      </div>
+      <div class="nav-item" data-view="plant" data-plant="仙桃旺旺糖果厂" data-label="仙桃旺旺糖果厂">
+        <span class="ico">🏢</span>仙桃旺旺糖果厂
+      </div>
+      <div class="nav-item" data-view="plant" data-plant="仙桃旺旺冰品厂" data-label="仙桃旺旺冰品厂">
+        <span class="ico">🏢</span>仙桃旺旺冰品厂
+      </div>
+      <div class="nav-item" data-view="plant" data-plant="湖北明旺米果厂" data-label="湖北明旺米果厂">
+        <span class="ico">🏢</span>湖北明旺米果厂
+      </div>
+    </div>
+
+    <div class="group">
+      <div class="nav-item" data-view="help" data-label="使用说明">
+        <span class="ico">📄</span>使用说明<span class="ico" style="margin-left:auto;font-size:12px">↗</span>
+      </div>
+    </div>
+
+    <div class="ver">
+      <div class="v">版本</div>
+      <div class="n">v20261029e</div>
+      <div class="optag">第 465 次优化</div>
+    </div>
+  </aside>
+
+  <!-- ================= 主区 ================= -->
+  <main class="main" id="main"></main>
+</div>
+
+<!-- 导入弹层 -->
+<div class="mask" id="importMask">
+  <div class="modal">
+    <button class="x" onclick="closeModal('importMask')">×</button>
+    <h2>📥 手动导入 / 实时更新数据</h2>
+    <p class="muted" style="margin:6px 0 0">数据不自动从机器拉取，由你在钉钉里手工导入，导入后全厂实时可见（符合你的选择）。</p>
+    <div class="hint" style="margin-top:16px">
+      <b>真实上线时这样用：</b>在钉钉宜搭的「考勤机数据」表单里，点「批量导入 Excel」，把考勤机导出的打卡表一次性灌进去 → 系统自动化规则触发 → 自动考勤、工时统计、人员考勤三张表立刻重算 → 所有在线用户实时看到新数据。下面可体验导入效果。
+    </div>
+    <div class="split">
+      <div class="panel" style="margin:0">
+        <div class="ptitle" style="font-size:15px"><span class="bar"></span>① 导入考勤机打卡数据</div>
+        <p class="muted" style="font-size:13px">字段：工号 / 日期 / 上班打卡 / 下班打卡</p>
+        <button class="btn" onclick="doImport('att')">导入 10 月打卡数据（模拟 286 条）</button>
+      </div>
+      <div class="panel" style="margin:0">
+        <div class="ptitle" style="font-size:15px"><span class="bar"></span>② 导入生产计划</div>
+        <p class="muted" style="font-size:13px">字段：日期 / 产线 / 品项规格 / 计划产量</p>
+        <button class="btn amber" onclick="doImport('plan')">导入 10 月生产计划（模拟）</button>
+      </div>
+    </div>
+    <div class="panel" style="margin:16px 0 0">
+      <div class="ptitle" style="font-size:15px"><span class="bar"></span>③ 导入花名册</div>
+      <p class="muted" style="font-size:13px">字段：工号 / 姓名 / 岗位 / 产线班组 / 技能等级 / 是否持证</p>
+      <button class="btn ghost" onclick="doImport('roster')">导入湖北总厂花名册（模拟 312 人）</button>
+    </div>
+    <div class="tbl-wrap" style="margin-top:18px">
+      <table><thead><tr><th>导入任务</th><th>目标表</th><th>条数</th><th>状态</th><th>完成时间</th><th>操作人</th></tr></thead><tbody id="impLog"></tbody></table>
+    </div>
+  </div>
+</div>
+
+<!-- 使用说明弹层 -->
+<div class="mask" id="helpMask">
+  <div class="modal">
+    <button class="x" onclick="closeModal('helpMask')">×</button>
+    <h2>📄 使用说明 · 搭建向导</h2>
+    <p class="muted">这份原型对应你截图里的导航结构，目前内容为空壳 + 少量演示数据，你后面一点一点告诉我内容，我再往里填。</p>
+    <ol class="steps">
+      <li><b>导航结构</b>：完全复刻截图 —— 工作区顶部「生产信息数据看板」展开 4 项，接着「湖北总厂生产计划」「湖北总厂花名册」，再是「生产部门（8 厂独立）」8 个厂，每厂内部 11 张子表（生产计划 → 参数设置 → 个人考勤日历 → 人员信息 → 考勤机数据 → 技能矩阵 → 品项规格用人 → 品项规格排班 → 人员考勤 → 工时统计与考勤 → 月度考勤数据）。</li>
+      <li><b>数据来源</b>：考勤机打卡、生产计划、花名册均为<b>手动导入</b>，导入后系统自动重算考勤与排班，全厂实时可见。</li>
+      <li><b>权限模型</b>：分厂隔离 + 总厂可见。各厂角色只看到自己厂 11 张子表；总厂/生产部角色额外看到全厂汇总（看板、各厂人力、基地调度、干部梯队、总厂计划、总厂花名册）。点右上角头像切换身份体验。</li>
+      <li><b>自动考勤</b>：考勤机数据 → 工时计算（跨零点自动处理）→ 出勤/迟到/早退/旷工/请假/休息判定 → 加班工时 → 异常标红。改导入数据即刷新。</li>
+      <li><b>自动排班</b>：三步 —— ① 在参数设置填每日产量与排班规则；② 按「产线×品项规格×工序」从技能矩阵自动抓人（主岗 A 优先）；③ 合规校验（重复排班/无证上岗/超时/连续出勤/人力缺口），全绿后回填。</li>
+      <li><b>实时协同</b>：点「🧑‍🤝‍🧑 模拟多人协作」看 3 个厂的人同时编辑，彼此立刻看到对方改动。真实上线用钉钉宜搭表单+报表，天然支持多人并发。</li>
+    </ol>
+    <div class="hint" style="margin-top:18px"><b>下一步：</b>告诉我你想先填哪一块的内容（比如「先从湖北立旺的人员信息开始」），我就把这块的表字段、校验规则、自动化都做扎实，一块一块来。</div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ==========================================================
+   数据层（前端模拟，上线后全部搬进钉钉宜搭数据模型）
+   ========================================================== */
+const PLANTS=["湖北立旺","湖北立旺二厂","湖北立旺三厂","湖北立旺四厂","仙桃旺旺膨化饼干厂","仙桃旺旺糖果厂","仙桃旺旺冰品厂","湖北明旺米果厂"];
+const SHORT={"湖北立旺":"一厂","湖北立旺二厂":"二厂","湖北立旺三厂":"三厂","湖北立旺四厂":"四厂","仙桃旺旺膨化饼干厂":"膨化饼干厂","仙桃旺旺糖果厂":"糖果厂","仙桃旺旺冰品厂":"冰品厂","湖北明旺米果厂":"米果厂"};
+const ROLES={
+  "总":"总厂生产部（可见全部）",
+  "立":"湖北立旺 厂长（只看一厂）",
+  "桃":"仙桃旺旺膨化饼干厂 线长（只看本厂）",
+  "明":"湖北明旺米果厂 班组长（只看本厂）"
+};
+let me="总";
+const today="2026-10-29";
+// 每厂在职人数（导入后变化）
+const onJob={};PLANTS.forEach((p,i)=>onJob[p]=40+i*3);
+const onSite={};PLANTS.forEach(p=>onSite[p]=Math.round(onJob[p]*.86));
+let imported={att:false,plan:false,roster:false};
+const log=[];
+
+/* ---------- 视图渲染 ---------- */
+const main=document.getElementById('main');
+const crumb=(arr)=>`<div class="crumb">工作区 / ${arr.map((a,i)=>i===arr.length-1?`<b>${a}</b>`:a).join(' / ')}</div>`;
+
+// 通用空表壳：表头 + 骨架行 + 操作区
+function emptyShell(title,sub,headers,rows=5,acts=[],note){
+  return `<div class="panel"><div class="ptitle"><span class="bar"></span>${title}</div>
+    <div class="sub">${sub}</div>
+    ${note||''}
+    <div style="margin-bottom:14px">${acts.map(a=>`<button class="btn ${a.c||''} sm" onclick="${a.fn}">${a.t}</button>`).join(' ')}</div>
+    <div class="tbl-wrap"><table><thead><tr>${headers.map(h=>`<th>${h}</th>`).join('')}</tr></thead>
+    <tbody>${[...Array(rows)].map(()=>'<tr>'+headers.map(()=>'<td><div class="sk-cell" style="height:16px"></div></td>').join('')+'</tr>').join('')}</tbody></table></div></div>`;
+}
+function table(headers,body,opt={}){
+  return `<div class="tbl-wrap"><table><thead><tr>${headers.map(h=>`<th>${h}</th>`).join('')}</tr></thead><tbody>${body}</tbody></table></div>`;
+}
+
+/* --- 看板 --- */
+function viewBoard(sub){
+  const rows=PLANTS.map((p,i)=>{
+    const att=imported.att?Math.round(onSite[p]/onJob[p]*100):0;
+    const rate=imported.plan?92+i*0.6:0;
+    const warn=!imported.att?'<span class="chip grey">未导入打卡</span>':(att<85?'<span class="chip err">⚠ 出勤偏低</span>':'<span class="chip ok">✔ 正常</span>');
+    return `<tr><td class="hl">${p}</td><td class="num">${onJob[p]}</td><td class="num">${onSite[p]}</td>
+      <td class="num">${imported.att?att+'%':'<span class="muted">—</span>'}</td>
+      <td class="num">${imported.plan?(12+i):'<span class="muted">—</span>'}</td>
+      <td class="num">${imported.plan?(11+Math.floor(i/2)):'<span class="muted">—</span>'}</td>
+      <td class="num">${imported.plan?Math.round((11+Math.floor(i/2))/(12+i)*100)+'%':'<span class="muted">—</span>'}</td>
+      <td class="num">${imported.plan?(3800+i*200):'<span class="muted">—</span>'}</td>
+      <td class="num">${imported.plan?(3800+i*200)*rate/100:'<span class="muted">—</span>'}</td>
+      <td class="num">${imported.plan?rate.toFixed(1)+'%':'<span class="muted">—</span>'}</td><td>${warn}</td></tr>`;
+  }).join('');
+  const totP=PLANTS.reduce((a,p)=>a+onJob[p],0),totS=PLANTS.reduce((a,p)=>a+onSite[p],0);
+  const kpi=`<div class="kpis">
+    <div class="kpi blue"><div class="k">全厂在册人数</div><div class="v">${totP}</div><div class="d">8 厂合计</div></div>
+    <div class="kpi green"><div class="k">今日在岗</div><div class="v">${totS}</div><div class="d">实时 · ${imported.att?'更新于今日':'待导入'}</div></div>
+    <div class="kpi ${imported.att?'amber':'grey'}"><div class="k">今日出勤率</div><div class="v">${imported.att?Math.round(totS/totP*100)+'%':'—'}</div><div class="d">出勤/在册</div></div>
+    <div class="kpi ${imported.plan?'green':'grey'}"><div class="k">今日计划达成率</div><div class="v">${imported.plan?'93.5%':'—'}</div><div class="d">加权</div></div>
+    <div class="kpi red"><div class="k">人力缺口预警</div><div class="v">${imported.att?PLANTS.filter(p=>onSite[p]/onJob[p]<0.85).length:'—'}</div><div class="d">出勤率 &lt;85% 的厂数</div></div>
+  </div>`;
+  let body;
+  if(sub==='open'){
+    body=kpi+table(['工厂','在册','在岗','出勤率','排班人数','今日开线','应开线','开线率','今日产量','计划产量','达成率','预警'],
+      PLANTS.map(p=>{const i=PLANTS.indexOf(p);return `<tr><td class="hl">${p}</td><td class="num">${onJob[p]}</td><td class="num">${onSite[p]}</td>
+        <td class="num">${imported.att?Math.round(onSite[p]/onJob[p]*100)+'%':'—'}</td>
+        <td class="num">${imported.plan?onSite[p]:'—'}</td><td class="num">${imported.plan?11+Math.floor(i/2):'—'}</td>
+        <td class="num">${imported.plan?12+i:'—'}</td><td class="num">${imported.plan?Math.round((11+Math.floor(i/2))/(12+i)*100)+'%':'—'}</td>
+        <td class="num">${imported.plan?(3800+i*200)*.935:'—'}</td><td class="num">${imported.plan?3800+i*200:'—'}</td>
+        <td class="num">${imported.plan?'93.5%':'—'}</td><td>${imported.att&&onSite[p]/onJob[p]<0.85?'<span class="chip err">⚠ 人力不足</span>':'<span class="chip ok">✔</span>'}</td></tr>`}).join(''));
+  }else{
+    body=kpi+table(['工厂','在册','在岗','出勤率','排班人数','今日开线','应开线','开线率','今日产量','计划产量','达成率','预警'],rows+'<tr class="tot"><td>合计</td><td class="num">'+totP+'</td><td class="num">'+totS+'</td><td class="num">'+(imported.att?Math.round(totS/totP*100)+'%':'—')+'</td><td colspan="8" class="muted">其余指标合计见「各厂当日开线情况」</td></tr>');
+  }
+  return crumb(['生产信息数据看板',sub==='open'?'各厂当日开线情况':'总览'])+body;
+}
+
+/* --- 各厂人力情况 --- */
+function viewManpower(){
+  const b=PLANTS.map((p,i)=>`<tr><td class="hl">${p}</td><td>操作工</td><td>${['一班','二班','主线','膨化线','糖果线','冰品线','米果线'][i%7]}</td>
+    <td class="num">${onJob[p]}</td><td class="num">${Math.round(onJob[p]*.95)}</td><td class="num">${onSite[p]}</td>
+    <td class="num">${imported.att?Math.round(onSite[p]/onJob[p]*100)+'%':'—'}</td>
+    <td class="num">${Math.round(onJob[p]*1.1)}</td><td class="num">${Math.max(0,Math.round(onJob[p]*1.1)-onJob[p])}</td>
+    <td class="num">${imported.att?(onJob[p]-onSite[p]):'—'}</td><td class="num">${Math.round(onJob[p]*.3)}</td><td class="num">${Math.round(onJob[p]*.4)}</td></tr>`).join('');
+  return crumb(['各厂人力情况'])+table(['工厂','岗位','产线/班组','在册','在职','今日在岗','出勤率','定编','缺口','今日缺勤','持证','技能A级'],b);
+}
+
+/* --- 基地人员调度 --- */
+function viewDispatch(){
+  const items=[
+    ['DD20261029-001','2026-10-29','湖北立旺','仙桃旺旺膨化饼干厂','LW018','李强','生产管理支援','1','<span class="chip warn">待执行</span>'],
+    ['DD20261029-002','2026-10-29','仙桃旺旺冰品厂','仙桃旺旺糖果厂','XT233','邓燕','包装熟练工支援','2','<span class="chip info">已执行</span>'],
+    ['DD20261029-003','2026-10-28','湖北明旺米果厂','湖北立旺二厂','MW017','彭娟','品项切换辅导','1','<span class="chip ok">已结束</span>']
+  ];
+  const b=items.map(r=>'<tr>'+r.map((c,i)=>`<td class="${i===4?'hl':''} ${i===7?'num':''}">${c}</td>`).join('')+'</tr>').join('');
+  return crumb(['基地人员调度情况'])+emptyShell('基地人员调度情况','跨厂支援 / 借调 / 临时调配台账，自动统计本月借调人天，各厂提需求、总厂统筹。',
+    ['调度单号','日期','调出厂','调入厂','工号','姓名','支援岗位','支援人天','状态','结算方式'],5,
+    [{t:'➕ 新建调度单',c:'',fn:'toast("已打开调度单表单（原型演示）")'},{t:'导出本月借调人天',c:'ghost',fn:'toast("已导出 Excel")'}],
+    `<div class="hint">真实上线用<b>钉钉宜搭流程</b>：提单人发起 → 调出厂厂长审批 → 调入厂厂长确认 → 自动写入台账并通知双方。权限上，各厂只能看自己参与的调度单，总厂全部可见。</div>`)+table(['调度单号','日期','调出厂','调入厂','工号','姓名','支援岗位','人天','状态'],b);
+}
+
+/* --- 干部梯队 --- */
+function viewCadre(){
+  const data=[
+    ['湖北立旺','生产部','生产经理','LW001','张伟','8.5','李强 LW018','可半年内接替','<span class="chip ok">B</span>'],
+    ['湖北立旺二厂','生产部','生产经理','LW201','王芳','6.2','赵磊 LW215','可一年内接替','<span class="chip info">C</span>'],
+    ['湖北立旺三厂','生产部','生产经理','LW301','陈明','5.8','刘洋 LW318','可半年内接替','<span class="chip ok">B</span>'],
+    ['仙桃旺旺膨化饼干厂','膨化线','线长','XT001','郑华','9.1','孙丽 XT019','可即时接替','<span class="chip" style="border-color:var(--green)">A</span>'],
+    ['仙桃旺旺糖果厂','糖果线','线长','XT101','冯军','4.3','许静 XT122','需培养','<span class="chip err">D</span>'],
+    ['湖北明旺米果厂','米果线','线长','MW001','曾勇','6.0','彭娟 MW017','可一年内接替','<span class="chip info">C</span>']
+  ];
+  return crumb(['干部梯队情况'])+table(['工厂','部门','现任岗位','现任工号','现任姓名','司龄(年)','后备人选','后备成熟度','接替准备度'],
+    data.map(r=>'<tr>'+r.map(c=>`<td>${c}</td>`).join('')+'</tr>').join(''));
+}
+
+/* --- 总厂生产计划 --- */
+function viewPlan(){
+  const b=[...Array(12)].map((_,m)=>{const ok=imported.plan&&m<10;const plan=ok?(100000+(m*213)):0;const act=ok?plan*.92:0;
+    return `<tr><td>${2026}-${String(m+1).padStart(2,'0')}</td><td class="hl">湖北立旺</td><td>主线</td><td>常规品</td>
+      <td class="num">${ok?plan.toLocaleString():'<span class="muted">待导入</span>'}</td>
+      <td class="num">${ok?Math.round(act).toLocaleString():'<span class="muted">—</span>'}</td>
+      <td class="num">${ok?(act/plan*100).toFixed(1)+'%':'—'}</td>
+      <td class="num ${ok&&act/plan<0.9?'hl':''}">${ok?(act-plan).toLocaleString():'—'}</td>
+      <td class="num">26</td><td class="num">${ok?Math.round(act/26).toLocaleString():'—'}</td>
+      <td>${ok?(act/plan>=0.9?'<span class="chip ok">进行中</span>':'<span class="chip err">预警</span>'):'<span class="chip grey">未开始</span>'}</td><td></td></tr>`}).join('');
+  return crumb(['湖北总厂生产计划'])+emptyShell('湖北总厂生产计划','月度计划与实际达成；计划量由 Excel 手工导入，达成率与差异自动算。<span class="chip info">手动导入</span>',
+    ['月份','工厂','产线','品项规格','计划产量','实际产量','达成率','差异量','开工日数','日均产量','完成状态','备注'],12,
+    [{t:'📥 导入生产计划 Excel',c:'amber',fn:'openImport()'},{t:'新建月度计划',c:'ghost',fn:'toast("已打开计划录入表单")'}])+table(['月份','工厂','产线','品项规格','计划产量','实际产量','达成率','差异量','开工日数','日均产量','状态','备注'],b);
+}
+
+/* --- 总厂花名册 --- */
+function viewRoster(){
+  const demo=[['LW001','张伟','湖北立旺','男','生产经理','生产部','A','是','2018-03-01','8.5','正式','138****0001'],
+    ['LW018','李强','湖北立旺','男','副经理','生产部','A','是','2019-11-20','6.9','正式','138****0018'],
+    ['XT001','郑华','仙桃旺旺膨化饼干厂','男','线长','膨化一线','A','是','2017-08-11','9.2','正式','138****1001'],
+    ['MW001','曾勇','湖北明旺米果厂','男','线长','米果线','A','是','2020-07-19','6.1','正式','138****2001']];
+  const b=demo.map(r=>'<tr>'+r.map((c,i)=>`<td class="${i===0?'hl':''} ${i===8?'num':''}">${imported.roster?c:'<span class="muted">待导入</span>'}</td>`).join('')+'</tr>').join('');
+  return crumb(['湖北总厂花名册'])+emptyShell('湖北总厂花名册','全厂人员主数据，是自动排班「谁能排」的唯一依据。导入后技能矩阵、品项规格用人自动带出可用人数。',
+    ['工号','姓名','工厂','性别','岗位','产线/班组','技能等级','持证','入职日期','司龄','用工类型','电话','状态'],6,
+    [{t:'📥 导入花名册 Excel',c:'',fn:'openImport()'},{t:'新增人员',c:'ghost',fn:'toast("已打开人员新增表单")'}])+table(['工号','姓名','工厂','性别','岗位','产线','技能','持证','入职','司龄','用工','电话'],b);
+}
+
+/* --- 工厂 11 张子表 --- */
+const SUB=[
+  {k:'plan',t:'生产计划',h:['日期','星期','产线','品项规格','计划产量','实际产量','达成率','开线状态','所需人力','缺口人力']},
+  {k:'param',t:'参数设置',h:['参数分类','参数项','取值','单位','说明','校验']},
+  {k:'cal',t:'个人考勤日历',h:['查询工号','1日','2日','3日','4日','5日','…','31日']},
+  {k:'info',t:'人员信息',h:['工号','姓名','性别','状态','岗位','产线/班组','技能等级','可排班次','持证','入职日期','电话']},
+  {k:'att',t:'考勤机数据',h:['工号','日期','上班打卡','下班打卡','打卡时长(h)','跨零点','数据来源','核对状态'],imp:'att'},
+  {k:'skill',t:'技能矩阵',h:['产线','品项规格','工序','P01','P02','P03','P04','P05','P06','P07','P08','P09']},
+  {k:'need',t:'品项规格用人',h:['产线','品项规格','工序','A级','B级','C级','可用合计','定编','缺口']},
+  {k:'sched',t:'品项规格排班',h:['工号','姓名','日期','产线','品项规格','工序','班次','计划产量','所需人力','出勤工时','排班校验']},
+  {k:'check',t:'人员考勤',h:['工号','姓名','日期','上班打卡','下班打卡','出勤工时','班次','标准工时','加班工时','出勤状态','迟到(分)','早退(分)','异常说明']},
+  {k:'stat',t:'工时统计与考勤',h:['工号','姓名','岗位','出勤天数','休息天数','出勤工时','加班工时','日均工时','迟到次数','早退次数','旷工天数','合规提示']},
+  {k:'month',t:'月度考勤数据',h:['工号','姓名','月份','在职状态','应出勤','实出勤','出勤率','加班工时','迟到','早退','异常扣项']}
+];
+function viewPlant(plant){
+  const i=PLANTS.indexOf(plant);
+  let html='';
+  SUB.forEach(s=>{
+    const ready = s.imp?imported[s.imp]:true;
+    const note = s.k==='sched'?`<div class="hint"><b>自动排班三步：</b>① 在「参数设置」填每日产量与规则 → ② 系统按「产线×品项规格×工序」从<b>技能矩阵</b>自动抓人（主岗 A 优先，其次 B、C）→ ③ 合规校验：重复排班 / 无证上岗 / 超时 / 连续出勤超 6 天 / 人力缺口，全绿后回填本表。</div>`:
+                s.k==='param'?`<div class="hint"><b>这是引擎：</b>标准工时 8h、月应出勤 26 天、人效 400 件/人日、连续出勤上限 6 天、每日最高 12h、每周最高 60h、持证强制 是。改这里，全厂自动考勤与排班跟着变。</div>`:
+                s.k==='att'?`<div class="hint"><b>数据入口：</b>这里是唯一的原始打卡数据表，每天从考勤机导出 Excel 后<b>手动导入</b>，其他考勤表全部由它自动生成，不要再手工抄数。</div>`:'';
+    const acts=s.k==='att'?[{t:'📥 导入打卡数据',c:'',fn:'openImport()'}]:
+               s.k==='sched'?[{t:'⚙️ 打开自动排班生成区',c:'amber',fn:'toast("已展开自动排班生成区：按产量×技能矩阵铺排 + 6 项校验")'},{t:'✅ 合规校验',c:'ghost',fn:'toast("校验完成：✔ 无重复排班　✔ 无超时　⚠ 膨化线主岗仅 2 人，建议培养 C 级")'}]:
+               s.k==='param'?[{t:'保存参数',c:'',fn:'toast("参数已保存，自动考勤/排班已重算")'}]:
+               s.k==='info'?[{t:'📥 从花名册同步',c:'',fn:'toast("已同步花名册，本厂人员已更新")'},{t:'新增人员',c:'ghost',fn:'toast("已打开人员表单")'}]:[];
+    html+=emptyShell(`${plant} · ${s.t}`,`${note}`,s.h,6,acts,note);
+  });
+  return crumb(['生产部门（8 厂独立）',plant])+`<div class="panel"><div class="ptitle"><span class="bar"></span>${plant} <span class="muted" style="font-size:13px;font-weight:400">11 张子表 · 结构与其他 7 厂完全一致</span></div>
+    <div class="sub">在职 ${onJob[plant]} 人 ｜ 今日在岗 ${onSite[plant]} 人 ｜ ${imported.att?'考勤已导入':'考勤未导入'} ｜ ${imported.plan?'计划已导入':'计划未导入'}</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">${SUB.map(s=>`<span class="chip ${s.imp&&!imported[s.imp]?'grey':'info'}" style="cursor:pointer" onclick="toast('定位到：${s.t}')">${s.t}${s.imp&&!imported[s.imp]?'　待导入':''}</span>`).join('')}</div></div>`+html;
+}
+
+/* ---------- 路由 ---------- */
+let cur={view:'board'};
+function render(){
+  const v=cur.view;
+  if(v==='board') main.innerHTML=viewBoard();
+  else if(v==='board-open') main.innerHTML=viewBoard('open');
+  else if(v==='manpower') main.innerHTML=viewManpower();
+  else if(v==='dispatch') main.innerHTML=viewDispatch();
+  else if(v==='cadre') main.innerHTML=viewCadre();
+  else if(v==='plan') main.innerHTML=viewPlan();
+  else if(v==='roster') main.innerHTML=viewRoster();
+  else if(v==='plant') main.innerHTML=viewPlant(cur.plant);
+  else if(v==='help') openHelp();
+}
+document.querySelectorAll('.nav-item').forEach(el=>el.addEventListener('click',()=>{
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  el.classList.add('active');
+  cur={view:el.dataset.view};
+  if(el.dataset.plant) cur.plant=el.dataset.plant;
+  render();
+}));
+
+/* ---------- 导入 ---------- */
+function openImport(){document.getElementById('importMask').classList.add('show');renderLog();}
+function closeModal(id){document.getElementById(id).classList.remove('show');}
+function doImport(type){
+  const meta={
+    att:{t:'导入考勤机打卡数据',dst:'各厂「考勤机数据」',n:286,unit:'条'},
+    plan:{t:'导入生产计划',dst:'各厂「生产计划」+ 总厂生产计划',n:31,unit:'行'},
+    roster:{t:'导入湖北总厂花名册',dst:'总厂花名册 + 各厂「人员信息」',n:312,unit:'人'}
+  }[type];
+  imported[type]=true;
+  log.unshift([meta.t,meta.dst,meta.n+meta.unit,'<span class="chip ok">✔ 已完成</span>',new Date().toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit'}),ROLES[me]]);
+  toast(`<div class="ld"></div>${meta.t}：${meta.n}${meta.unit} 已导入，自动考勤/排班正在重算…`);
+  setTimeout(()=>{renderLog();render();toast(`${meta.t} 重算完成，全厂 ${PLANTS.length} 个厂实时可见`);},1200);
+}
+function renderLog(){
+  document.getElementById('impLog').innerHTML=log.map(r=>'<tr>'+r.map((c,i)=>`<td class="${i===2?'num':''}">${c}</td>`).join('')+'</tr>').join('')+
+    (log.length?'':'<tr><td colspan="6" class="muted" style="text-align:center;padding:30px">暂无导入记录</td></tr>');
+}
+
+/* ---------- 实时协同模拟 ---------- */
+let simTimer=null;
+const colabs=[
+  ['仙桃旺旺膨化饼干厂','线长 郑华 刚在「品项规格排班」排入 3 人（包装工序·白班）','#3DD69B'],
+  ['湖北立旺二厂','厂长 王芳 更新了「参数设置」：连续出勤上限改为 5 天','#E0A020'],
+  ['湖北明旺米果厂','班组长 曾勇 导入了今日 46 条打卡记录','#3D7BD9'],
+  ['湖北立旺','HR 黄丽 在「人员信息」新增 2 名操作工','#8E5CD9'],
+  ['仙桃旺旺糖果厂','线长 冯军 提交调度申请：向冰品厂借调 2 人','#E07B39']
+];
+let ci=0;
+function tickColab(){
+  const c=colabs[ci++%colabs.length];
+  const n=3+(ci%3);
+  document.getElementById('liveTxt').innerHTML=`实时协同已连接 · <b style="color:var(--glow)">${n} 人在线</b> ｜ ${c[0]} · ${c[1]}`;
+  document.getElementById('dsBadge').textContent=2+(ci%3);
+  document.getElementById('dsBadge').style.display='inline-block';
+}
+document.getElementById('simBtn').addEventListener('click',function(){
+  if(simTimer){clearInterval(simTimer);simTimer=null;this.classList.remove('on');this.textContent='🧑‍🤝‍🧑 模拟多人协作';
+    document.getElementById('liveTxt').innerHTML='实时协同已连接 · 3 人在线';toast('已停止协同模拟');}
+  else{this.classList.add('on');this.textContent='⏹ 停止模拟';toast('开始模拟：8 个厂的人正在同时在线编辑，左侧导航的「基地人员调度」角标会跟着变');
+    tickColab();simTimer=setInterval(tickColab,2600);}
+});
+
+/* ---------- 身份切换 / 权限隔离 ---------- */
+document.getElementById('who').addEventListener('click',function(){
+  const k=Object.keys(ROLES);me=k[(k.indexOf(me)+1)%k.length];this.textContent=me;
+  const map={总:'总',立:'立',桃:'桃',明:'明'};this.textContent=map[me];
+  toast(`已切换身份：${ROLES[me]}<br>${me==='总'?'现在你能看到全部 8 厂 + 汇总表':'现在你<b>只能</b>看到本厂的 11 张子表，总厂汇总表已隐藏'}`);
+  document.getElementById('liveTxt').innerHTML=me==='总'?'实时协同已连接 · 全厂视角':'实时协同已连接 · 本厂视角（隔离中）';
+});
+
+/* ---------- 通用 ---------- */
+function openHelp(){document.getElementById('helpMask').classList.add('show');}
+let tt;
+function toast(msg){
+  const t=document.getElementById('toast');t.innerHTML=msg;t.classList.add('show');
+  clearTimeout(tt);tt=setTimeout(()=>t.classList.remove('show'),3500);
+}
+document.querySelectorAll('.mask').forEach(m=>m.addEventListener('click',e=>{if(e.target===m)closeModal(m.id)}));
+document.getElementById('importBtn').addEventListener('click',openImport);
+render();
+</script>
+</body>
+</html>
