@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>生产信息数据看板</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif; background: #f0f2f5; height: 100vh; overflow: hidden; }
+
+/* 顶部栏 */
+.header { height: 50px; background: linear-gradient(135deg, #1a6fc4 0%, #0d4f8c 100%); color: #fff; display: flex; align-items: center; padding: 0 20px; box-shadow: 0 2px 8px rgba(0,0,0,.2); position: relative; z-index: 100; }
+.header h1 { font-size: 16px; font-weight: 600; margin-left: 12px; }
+.header .logo { width: 28px; height: 28px; background: #fff; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 18px; }
+.header .right-area { margin-left: auto; display: flex; align-items: center; gap: 12px; }
+.header .user-avatar { width: 32px; height: 32px; border-radius: 50%; background: #ffd666; display: flex; align-items: center; justify-content: center; font-size: 14px; cursor: pointer; transition: transform .2s; }
+.header .user-avatar:hover { transform: scale(1.1); }
+.header select.user-switch { background: rgba(255,255,255,.15); color: #fff; border: 1px solid rgba(255,255,255,.3); border-radius: 6px; padding: 4px 8px; font-size: 12px; cursor: pointer; }
+.header select.user-switch option { background: #333; color: #fff; }
+
+/* 主体 */
+.main { display: flex; height: calc(100vh - 50px); }
+
+/* 左侧导航 */
+.sidebar { width: 260px; background: #fff; border-right: 1px solid #e8e8e8; overflow-y: auto; flex-shrink: 0; }
+.nav-section { padding: 8px 0; }
+.nav-item { padding: 10px 16px 10px 20px; cursor: pointer; display: flex; align-items: center; gap: 8px; font-size: 13px; color: #333; transition: all .15s; user-select: none; }
+.nav-item:hover { background: #e6f7ff; }
+.nav-item.active { background: #1890ff; color: #fff; }
+.nav-item .icon { font-size: 15px; width: 20px; text-align: center; flex-shrink: 0; }
+.nav-item .arrow { margin-left: auto; font-size: 10px; transition: transform .2s; opacity: .5; }
+.nav-item.expanded .arrow { transform: rotate(90deg); }
+.nav-sub { display: none; background: #fafafa; }
+.nav-sub.open { display: block; }
+.nav-sub .nav-item { padding-left: 48px; font-size: 12px; color: #666; }
+.nav-sub .nav-item:hover { background: #e6f7ff; color: #1890ff; }
+.nav-sub .nav-item.active { background: #1890ff; color: #fff; }
+
+/* 内容区 */
+.content { flex: 1; overflow-y: auto; padding: 20px; }
+.page-title { font-size: 20px; font-weight: 600; margin-bottom: 16px; color: #1a1a1a; }
+.toolbar { display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; align-items: center; }
+.toolbar button { padding: 8px 16px; border: none; border-radius: 6px; cursor: pointer; font-size: 13px; transition: all .2s; font-weight: 500; }
+.btn-primary { background: #1890ff; color: #fff; }
+.btn-primary:hover { background: #40a9ff; }
+.btn-success { background: #52c41a; color: #fff; }
+.btn-success:hover { background: #73d13d; }
+.btn-orange { background: #fa8c16; color: #fff; }
+.btn-orange:hover { background: #ffa940; }
+.btn-purple { background: #722ed1; color: #fff; }
+.btn-purple:hover { background: #9254de; }
+
+/* 卡片 */
+.card { background: #fff; border-radius: 8px; padding: 20px; margin-bottom: 16px; box-shadow: 0 1px 4px rgba(0,0,0,.08); }
+.card h3 { font-size: 15px; margin-bottom: 12px; color: #333; }
+
+/* 表格 */
+table { width: 100%; border-collapse: collapse; font-size: 12px; }
+th { background: #fafafa; padding: 10px 8px; text-align: left; border-bottom: 2px solid #e8e8e8; font-weight: 600; color: #333; position: sticky; top: 0; }
+td { padding: 8px; border-bottom: 1px solid #f0f0f0; }
+tr:hover td { background: #fafafa; }
+
+/* 空状态 */
+.empty-state { text-align: center; padding: 60px 20px; color: #bbb; }
+.empty-state .icon { font-size: 48px; margin-bottom: 12px; }
+.empty-state p { font-size: 14px; }
+
+/* 协作提示 */
+.collab-badge { display: inline-flex; align-items: center; gap: 6px; background: #f6ffed; border: 1px solid #b7eb8f; border-radius: 12px; padding: 4px 12px; font-size: 12px; color: #52c41a; margin-bottom: 12px; }
+.collab-badge .dot { width: 8px; height: 8px; border-radius: 50%; background: #52c41a; animation: pulse 1.5s infinite; }
+@keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .4; } }
+
+/* 导入弹窗 */
+.modal-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,.5); z-index: 1000; align-items: center; justify-content: center; }
+.modal-overlay.open { display: flex; }
+.modal { background: #fff; border-radius: 12px; width: 520px; max-width: 90vw; padding: 24px; }
+.modal h2 { font-size: 16px; margin-bottom: 16px; }
+.modal label { display: block; font-size: 13px; margin-bottom: 6px; color: #666; }
+.modal input[type="file"] { width: 100%; padding: 8px; border: 1px dashed #d9d9d9; border-radius: 6px; margin-bottom: 12px; }
+.modal .actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 16px; }
+.modal .actions button { padding: 8px 20px; border-radius: 6px; border: 1px solid #d9d9d9; background: #fff; cursor: pointer; }
+.modal .actions button.confirm { background: #1890ff; color: #fff; border-color: #1890ff; }
+
+/* 参数面板 */
+.param-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
+.param-item { background: #fafafa; border-radius: 6px; padding: 12px; }
+.param-item label { font-size: 12px; color: #666; display: block; margin-bottom: 4px; }
+.param-item input, .param-item select { width: 100%; padding: 6px 8px; border: 1px solid #d9d9d9; border-radius: 4px; font-size: 13px; }
+
+/* 排班日历 */
+.schedule-grid { display: grid; grid-template-columns: 100px repeat(31, 1fr); gap: 1px; background: #e8e8e8; border: 1px solid #e8e8e8; overflow-x: auto; }
+.schedule-grid > div { background: #fff; padding: 4px; text-align: center; font-size: 11px; min-width: 28px; }
+.schedule-grid .header-cell { background: #f0f5ff; font-weight: 600; }
+.schedule-grid .name-cell { background: #fafafa; font-weight: 500; text-align: left; padding-left: 8px; position: sticky; left: 0; z-index: 1; }
+.schedule-grid .shift-day { cursor: pointer; transition: background .15s; }
+.schedule-grid .shift-day:hover { background: #e6f7ff; }
+.schedule-grid .shift-白 { background: #e6f7ff; color: #1890ff; }
+.schedule-grid .shift-中 { background: #fff7e6; color: #fa8c16; }
+.schedule-grid .shift-夜 { background: #f9f0ff; color: #722ed1; }
+.schedule-grid .shift-休 { background: #f6ffed; color: #52c41a; }
+
+/* 考勤统计 */
+.stat-row { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 16px; }
+.stat-card { background: #fff; border-radius: 8px; padding: 16px 20px; flex: 1; min-width: 150px; box-shadow: 0 1px 4px rgba(0,0,0,.08); }
+.stat-card .label { font-size: 12px; color: #999; margin-bottom: 4px; }
+.stat-card .value { font-size: 24px; font-weight: 700; color: #1890ff; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="logo">📊</div>
+  <h1>生产信息数据看板</h1>
+  <div class="right-area">
+    <select class="user-switch" onchange="switchUser(this.value)">
+      <option value="admin">总厂管理员</option>
+      <option value="hubei1">湖北立旺一厂</option>
+      <option value="hubei2">湖北立旺二厂</option>
+      <option value="hubei3">湖北立旺三厂</option>
+      <option value="hubei4">湖北立旺四厂</option>
+      <option value="hubei5">湖北立旺五厂</option>
+      <option value="hubei6">湖北立旺六厂</option>
+      <option value="hubei7">湖北立旺七厂</option>
+      <option value="hubei8">湖北立旺八厂</option>
+    </select>
+    <div class="user-avatar" title="当前用户">管</div>
+  </div>
+</div>
+
+<div class="main">
+  <!-- 左侧导航 -->
+  <div class="sidebar" id="sidebar"></div>
+
+  <!-- 内容区 -->
+  <div class="content" id="content">
+    <div class="collab-badge"><span class="dot"></span> 实时协作中 · 8 个分厂在线 · 数据自动同步</div>
+    <div id="page-content"></div>
+  </div>
+</div>
+
+<!-- 导入弹窗 -->
+<div class="modal-overlay" id="importModal">
+  <div class="modal">
+    <h2 id="modalTitle">📥 导入数据</h2>
+    <label>选择 Excel / CSV 文件</label>
+    <input type="file" accept=".xlsx,.xls,.csv">
+    <p style="font-size:12px;color:#999;margin-bottom:8px;">支持考勤机导出、生产计划表、花名册等格式</p>
+    <div class="actions">
+      <button onclick="closeModal()">取消</button>
+      <button class="confirm" onclick="doImport()">确认导入</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ===== 导航配置 =====
+const navConfig = [
+  {
+    title: "工作区", items: [
+      { name: "生产信息数据看板", icon: "📊", expanded: true, children: [
+        { name: "生产计划", page: "production_plan" },
+        { name: "花名册", page: "roster" },
+        { name: "考勤机数据", page: "attendance_machine" },
+        { name: "人员考勤", page: "personnel_attendance" },
+      ]},
+      { name: "总厂生产计划", icon: "📋", page: "hq_plan" },
+      { name: "总厂花名册", icon: "👥", page: "hq_roster" },
+    ]
+  },
+  {
+    title: "生产部门（8厂独立）", items: [
+      { name: "湖北立旺一厂", icon: "🏭", children: [
+        { name: "生产计划", page: "plant1_plan" },
+        { name: "参数设置", page: "plant1_params" },
+        { name: "个人考勤日历", page: "plant1_calendar" },
+        { name: "人员信息", page: "plant1_staff" },
+        { name: "考勤机数据", page: "plant1_machine" },
+        { name: "技能矩阵", page: "plant1_skills" },
+        { name: "品项规格用人", page: "plant1_product_spec" },
+        { name: "品项规格排班", page: "plant1_product_schedule" },
+        { name: "人员考勤", page: "plant1_attendance" },
+        { name: "工时统计与考勤", page: "plant1_hours" },
+        { name: "月度考勤数据", page: "plant1_monthly" },
+      ]},
+      { name: "湖北立旺二厂", icon: "🏭", children: [
+        { name: "生产计划", page: "plant2_plan" },
+        { name: "参数设置", page: "plant2_params" },
+        { name: "个人考勤日历", page: "plant2_calendar" },
+        { name: "人员信息", page: "plant2_staff" },
+        { name: "考勤机数据", page: "plant2_machine" },
+        { name: "技能矩阵", page: "plant2_skills" },
+        { name: "品项规格用人", page: "plant2_product_spec" },
+        { name: "品项规格排班", page: "plant2_product_schedule" },
+        { name: "人员考勤", page: "plant2_attendance" },
+        { name: "工时统计与考勤", page: "plant2_hours" },
+        { name: "月度考勤数据", page: "plant2_monthly" },
+      ]},
+      { name: "湖北立旺三厂", icon: "🏭", children: [
+        { name: "生产计划", page: "plant3_plan" },
+        { name: "参数设置", page: "plant3_params" },
+        { name: "个人考勤日历", page: "plant3_calendar" },
+        { name: "人员信息", page: "plant3_staff" },
+        { name: "考勤机数据", page: "plant3_machine" },
+        { name: "技能矩阵", page: "plant3_skills" },
+        { name: "品项规格用人", page: "plant3_product_spec" },
+        { name: "品项规格排班", page: "plant3_product_schedule" },
+        { name: "人员考勤", page: "plant3_attendance" },
+        { name: "工时统计与考勤", page: "plant3_hours" },
+        { name: "月度考勤数据", page: "plant3_monthly" },
+      ]},
+      { name: "湖北立旺四厂", icon: "🏭", children: [
+        { name: "生产计划", page: "plant4_plan" },
+        { name: "参数设置", page: "plant4_params" },
+        { name: "个人考勤日历", page: "plant4_calendar" },
+        { name: "人员信息", page: "plant4_staff" },
+        { name: "考勤机数据", page: "plant4_machine" },
+        { name: "技能矩阵", page: "plant4_skills" },
+        { name: "品项规格用人", page: "plant4_product_spec" },
+        { name: "品项规格排班", page: "plant4_product_schedule" },
+        { name: "人员考勤", page: "plant4_attendance" },
+        { name: "工时统计与考勤", page: "plant4_hours" },
+        { name: "月度考勤数据", page: "plant4_monthly" },
+      ]},
+      { name: "湖北立旺五厂", icon: "🏭", children: [
+        { name: "生产计划", page: "plant5_plan" },
+        { name: "参数设置", page: "plant5_params" },
+        { name: "个人考勤日历", page: "plant5_calendar" },
+        { name: "人员信息", page: "plant5_staff" },
+        { name: "考勤机数据", page: "plant5_machine" },
+        { name: "技能矩阵", page: "plant5_skills" },
+        { name: "品项规格用人", page: "plant5_product_spec" },
+        { name: "品项规格排班", page: "plant5_product_schedule" },
+        { name: "人员考勤", page: "plant5_attendance" },
+        { name: "工时统计与考勤", page: "plant5_hours" },
+        { name: "月度考勤数据", page: "plant5_monthly" },
+      ]},
+      { name: "湖北立旺六厂", icon: "🏭", children: [
+        { name: "生产计划", page: "plant6_plan" },
+        { name: "参数设置", page: "plant6_params" },
+        { name: "个人考勤日历", page: "plant6_calendar" },
+        { name: "人员信息", page: "plant6_staff" },
+        { name: "考勤机数据", page: "plant6_machine" },
+        { name: "技能矩阵", page: "plant6_skills" },
+        { name: "品项规格用人", page: "plant6_product_spec" },
+        { name: "品项规格排班", page: "plant6_product_schedule" },
+        { name: "人员考勤", page: "plant6_attendance" },
+        { name: "工时统计与考勤", page: "plant6_hours" },
+        { name: "月度考勤数据", page: "plant6_monthly" },
+      ]},
+      { name: "湖北立旺七厂", icon: "🏭", children: [
+        { name: "生产计划", page: "plant7_plan" },
+        { name: "参数设置", page: "plant7_params" },
+        { name: "个人考勤日历", page: "plant7_calendar" },
+        { name: "人员信息", page: "plant7_staff" },
+        { name: "考勤机数据", page: "plant7_machine" },
+        { name: "技能矩阵", page: "plant7_skills" },
+        { name: "品项规格用人", page: "plant7_product_spec" },
+        { name: "品项规格排班", page: "plant7_product_schedule" },
+        { name: "人员考勤", page: "plant7_attendance" },
+        { name: "工时统计与考勤", page: "plant7_hours" },
+        { name: "月度考勤数据", page: "plant7_monthly" },
+      ]},
+      { name: "湖北立旺八厂", icon: "🏭", children: [
+        { name: "生产计划", page: "plant8_plan" },
+        { name: "参数设置", page: "plant8_params" },
+        { name: "个人考勤日历", page: "plant8_calendar" },
+        { name: "人员信息", page: "plant8_staff" },
+        { name: "考勤机数据", page: "plant8_machine" },
+        { name: "技能矩阵", page: "plant8_skills" },
+        { name: "品项规格用人", page: "plant8_product_spec" },
+        { name: "品项规格排班", page: "plant8_product_schedule" },
+        { name: "人员考勤", page: "plant8_attendance" },
+        { name: "工时统计与考勤", page: "plant8_hours" },
+        { name: "月度考勤数据", page: "plant8_monthly" },
+      ]},
+    ]
+  }
+];
+
+// ===== 当前状态 =====
+let currentUser = 'admin';
+let currentPage = 'production_plan';
+
+// ===== 渲染导航 =====
+function renderSidebar() {
+  const sb = document.getElementById('sidebar');
+  let html = '';
+  navConfig.forEach(section => {
+    html += `<div class="nav-section">`;
+    section.items.forEach(item => {
+      if (item.children) {
+        const isExpanded = item.expanded;
+        html += `<div class="nav-item ${isExpanded ? 'expanded' : ''}" onclick="toggleNav(this)">
+          <span class="icon">${item.icon}</span>${item.name}
+          <span class="arrow">▶</span>
+        </div>`;
+        html += `<div class="nav-sub ${isExpanded ? 'open' : ''}">`;
+        item.children.forEach(child => {
+          const active = (child.page === currentPage) ? 'active' : '';
+          html += `<div class="nav-item ${active}" onclick="navigate('${child.page}')">${child.name}</div>`;
+        });
+        html += `</div>`;
+      } else {
+        const active = (item.page === currentPage) ? 'active' : '';
+        html += `<div class="nav-item ${active}" onclick="navigate('${item.page}')">
+          <span class="icon">${item.icon}</span>${item.name}
+        </div>`;
+      }
+    });
+    html += `</div>`;
+  });
+  sb.innerHTML = html;
+}
+
+function toggleNav(el) {
+  el.classList.toggle('expanded');
+  const sub = el.nextElementSibling;
+  if (sub && sub.classList.contains('nav-sub')) {
+    sub.classList.toggle('open');
+  }
+}
+
+function navigate(page) {
+  currentPage = page;
+  renderSidebar();
+  renderPage();
+}
+
+// ===== 页面内容 =====
+function renderPage() {
+  const pc = document.getElementById('page-content');
+  let html = '';
+
+  switch(currentPage) {
+    case 'production_plan':
+      html = `
+        <div class="page-title">📊 生产计划</div>
+        <div class="toolbar">
+          <button class="btn-primary" onclick="openImport('生产计划导入')">📥 导入生产计划</button>
+          <button class="btn-success">➕ 新增计划</button>
+          <button class="btn-orange">📤 导出</button>
+        </div>
+        <div class="card">
+          <table>
+            <thead><tr><th>品项</th><th>计划产量</th><th>计划日期</th><th>产线</th><th>状态</th></tr></thead>
+            <tbody>
+              <tr><td colspan="5"><div class="empty-state"><div class="icon">📭</div><p>暂无数据，请点击「导入生产计划」上传 Excel</p></div></td></tr>
+            </tbody>
+          </table>
+        </div>`;
+      break;
+
+    case 'roster':
+      html = `
+        <div class="page-title">👥 花名册</div>
+        <div class="toolbar">
+          <button class="btn-primary" onclick="openImport('花名册导入')">📥 导入花名册</button>
+          <button class="btn-success">➕ 新增人员</button>
+        </div>
+        <div class="card">
+          <table>
+            <thead><tr><th>工号</th><th>姓名</th><th>部门</th><th>岗位</th><th>入职日期</th><th>状态</th></tr></thead>
+            <tbody>
+              <tr><td colspan="6"><div class="empty-state"><div class="icon">📭</div><p>暂无人员数据，请导入花名册</p></div></td></tr>
+            </tbody>
+          </table>
+        </div>`;
+      break;
+
+    case 'attendance_machine':
+      html = `
+        <div class="page-title">🕐 考勤机数据</div>
+        <div class="toolbar">
+          <button class="btn-primary" onclick="openImport('考勤机数据导入')">📥 导入打卡记录</button>
+          <button class="btn-success">🔄 同步考勤机</button>
+        </div>
+        <div class="card">
+          <table>
+            <thead><tr><th>工号</th><th>姓名</th><th>打卡日期</th><th>打卡时间</th><th>打卡类型</th><th>设备编号</th></tr></thead>
+            <tbody>
+              <tr><td colspan="6"><div class="empty-state"><div class="icon">📭</div><p>暂无打卡数据，请导入考勤机导出文件</p></div></td></tr>
+            </tbody>
+          </table>
+        </div>`;
+      break;
+
+    case 'personnel_attendance':
+      html = `
+        <div class="page-title">📋 人员考勤</div>
+        <div class="stat-row">
+          <div class="stat-card"><div class="label">应出勤</div><div class="value">0</div></div>
+          <div class="stat-card"><div class="label">实际出勤</div><div class="value">0</div></div>
+          <div class="stat-card"><div class="label">缺勤</div><div class="value">0</div></div>
+          <div class="stat-card"><div class="label">迟到早退</div><div class="value">0</div></div>
+        </div>
+        <div class="card">
+          <table>
+            <thead><tr><th>工号</th><th>姓名</th><th>日期</th><th>班次</th><th>上班时间</th><th>下班时间</th><th>工时</th><th>状态</th></tr></thead>
+            <tbody>
+              <tr><td colspan="8"><div class="empty-state"><div class="icon">📭</div><p>考勤数据将根据导入的考勤机数据自动计算</p></div></td></tr>
+            </tbody>
+          </table>
+        </div>`;
+      break;
+
+    case 'hq_plan':
+      html = `<div class="page-title">📋 总厂生产计划</div><div class="card"><div class="empty-state"><div class="icon">📭</div><p>总厂汇总数据 · 待配置</p></div></div>`;
+      break;
+
+    case 'hq_roster':
+      html = `<div class="page-title">👥 总厂花名册</div><div class="card"><div class="empty-state"><div class="icon">📭</div><p>总厂人员汇总 · 待配置</p></div></div>`;
+      break;
+
+    // 分厂页面
+    default:
+      if (currentPage.startsWith('plant')) {
+        const plantNames = { 'plant1':'湖北立旺一厂','plant2':'湖北立旺二厂','plant3':'湖北立旺三厂','plant4':'湖北立旺四厂','plant5':'湖北立旺五厂','plant6':'湖北立旺六厂','plant7':'湖北立旺七厂','plant8':'湖北立旺八厂' };
+        const plantNum = currentPage.match(/plant(\d)/)[1];
+        const pageMap = {
+          [`plant${plantNum}_plan`]: '生产计划',
+          [`plant${plantNum}_params`]: '参数设置',
+          [`plant${plantNum}_calendar`]: '个人考勤日历',
+          [`plant${plantNum}_staff`]: '人员信息',
+          [`plant${plantNum}_machine`]: '考勤机数据',
+          [`plant${plantNum}_skills`]: '技能矩阵',
+          [`plant${plantNum}_product_spec`]: '品项规格用人',
+          [`plant${plantNum}_product_schedule`]: '品项规格排班',
+          [`plant${plantNum}_attendance`]: '人员考勤',
+          [`plant${plantNum}_hours`]: '工时统计与考勤',
+          [`plant${plantNum}_monthly`]: '月度考勤数据',
+        };
+        const pageTitle = pageMap[currentPage] || '页面';
+
+        if (currentPage.endsWith('_params')) {
+          html = `
+            <div class="page-title">⚙️ ${plantNames['plant'+plantNum]} · 参数设置</div>
+            <div class="card">
+              <h3>班次参数</h3>
+              <div class="param-grid">
+                <div class="param-item"><label>白班开始</label><input type="time" value="08:00"></div>
+                <div class="param-item"><label>白班结束</label><input type="time" value="16:00"></div>
+                <div class="param-item"><label>中班开始</label><input type="time" value="16:00"></div>
+                <div class="param-item"><label>中班结束</label><input type="time" value="24:00"></div>
+                <div class="param-item"><label>夜班开始</label><input type="time" value="00:00"></div>
+                <div class="param-item"><label>夜班结束</label><input type="time" value="08:00"></div>
+                <div class="param-item"><label>加班起算(小时)</label><input type="number" value="8" min="0" step="0.5"></div>
+                <div class="param-item"><label>迟到阈值(分钟)</label><input type="number" value="15" min="1"></div>
+              </div>
+            </div>`;
+        } else if (currentPage.endsWith('_calendar')) {
+          html = `
+            <div class="page-title">📅 ${plantNames['plant'+plantNum]} · 个人考勤日历</div>
+            <div class="toolbar">
+              <button class="btn-primary">◀ 上月</button>
+              <span style="font-size:14px;font-weight:600;">2026年10月</span>
+              <button class="btn-primary">下月 ▶</button>
+            </div>
+            <div class="card">
+              <div class="empty-state"><div class="icon">📅</div><p>考勤日历 · 导入人员数据后自动生成</p></div>
+            </div>`;
+        } else if (currentPage.endsWith('_skills')) {
+          html = `
+            <div class="page-title">🎯 ${plantNames['plant'+plantNum]} · 技能矩阵</div>
+            <div class="card">
+              <div class="empty-state"><div class="icon">🎯</div><p>技能矩阵 · 待导入人员技能数据</p></div>
+            </div>`;
+        } else if (currentPage.endsWith('_product_spec')) {
+          html = `
+            <div class="page-title">📦 ${plantNames['plant'+plantNum]} · 品项规格用人</div>
+            <div class="card">
+              <div class="empty-state"><div class="icon">📦</div><p>品项规格用人配置 · 待录入</p></div>
+            </div>`;
+        } else if (currentPage.endsWith('_product_schedule')) {
+          html = `
+            <div class="page-title">📅 ${plantNames['plant'+plantNum]} · 品项规格排班</div>
+            <div class="card">
+              <div class="empty-state"><div class="icon">📅</div><p>排班引擎 · 配置参数后自动生成</p></div>
+            </div>`;
+        } else if (currentPage.endsWith('_hours')) {
+          html = `
+            <div class="page-title">⏱️ ${plantNames['plant'+plantNum]} · 工时统计与考勤</div>
+            <div class="stat-row">
+              <div class="stat-card"><div class="label">总工时</div><div class="value">0</div></div>
+              <div class="stat-card"><div class="label">加班工时</div><div class="value">0</div></div>
+              <div class="stat-card"><div class="label">出勤人数</div><div class="value">0</div></div>
+            </div>
+            <div class="card"><div class="empty-state"><div class="icon">⏱️</div><p>工时统计 · 待考勤数据导入</p></div></div>`;
+        } else if (currentPage.endsWith('_monthly')) {
+          html = `
+            <div class="page-title">📊 ${plantNames['plant'+plantNum]} · 月度考勤数据</div>
+            <div class="card"><div class="empty-state"><div class="icon">📊</div><p>月度汇总 · 待月末结算</p></div></div>`;
+        } else {
+          html = `
+            <div class="page-title">${plantNames['plant'+plantNum]} · ${pageTitle}</div>
+            <div class="toolbar">
+              <button class="btn-primary" onclick="openImport('${pageTitle}导入')">📥 导入数据</button>
+              <button class="btn-success">➕ 新增</button>
+            </div>
+            <div class="card">
+              <table><thead><tr><th>序号</th><th>名称</th><th>日期</th><th>状态</th></tr></thead>
+              <tbody><tr><td colspan="4"><div class="empty-state"><div class="icon">📭</div><p>暂无数据 · 请导入或新增</p></div></td></tr></tbody></table>
+            </div>`;
+        }
+      } else {
+        html = `<div class="page-title">页面</div><div class="card"><div class="empty-state"><div class="icon">📭</div><p>功能开发中</p></div></div>`;
+      }
+  }
+
+  pc.innerHTML = html;
+}
+
+// ===== 用户切换 =====
+function switchUser(val) {
+  currentUser = val;
+  const avatars = { 'admin':'总','hubei1':'一','hubei2':'二','hubei3':'三','hubei4':'四','hubei5':'五','hubei6':'六','hubei7':'七','hubei8':'八' };
+  document.querySelector('.user-avatar').textContent = avatars[val] || '?';
+  if (val !== 'admin') {
+    alert(`已切换到 ${val} 视角\n\n分厂模式下：\n• 只能看到本厂数据\n• 总厂汇总表已隐藏\n• 编辑操作实时同步到总厂`);
+  } else {
+    alert('已切换回总厂管理员视角\n\n可查看所有分厂数据');
+  }
+}
+
+// ===== 导入弹窗 =====
+function openImport(title) {
+  document.getElementById('modalTitle').textContent = '📥 ' + title;
+  document.getElementById('importModal').classList.add('open');
+}
+
+function closeModal() {
+  document.getElementById('importModal').classList.remove('open');
+}
+
+function doImport() {
+  closeModal();
+  alert('导入功能演示\n\n实际部署时会：\n1. 解析 Excel/CSV 文件\n2. 校验数据格式\n3. 写入数据库\n4. 刷新看板数据\n\n当前为原型演示，数据不会真正写入。');
+}
+
+// ===== 初始化 =====
+renderSidebar();
+renderPage();
+</script>
+</body>
+</html>
